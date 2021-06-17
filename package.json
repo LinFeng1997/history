@@ -44,6 +44,7 @@
     "karma-mocha-reporter": "^2.2.5",
     "karma-sourcemap-loader": "^0.3.7",
     "karma-webpack": "^3.0.5",
+    "karma-coverage": "^2.0.3",
     "mocha": "^5.2.0",
     "prompt-confirm": "^2.0.4",
     "rollup": "^1.27.9",

@@ -70,11 +70,18 @@ module.exports = function(config) {
     customLaunchers: customLaunchers,
     browsers: ['Chrome' /*, 'Firefox'*/],
     frameworks: ['mocha'],
-    reporters: ['mocha'],
+    reporters: ['mocha','coverage'],
     files: ['tests.webpack.js'],
     preprocessors: {
-      'tests.webpack.js': ['webpack', 'sourcemap']
+      'tests.webpack.js': ['webpack', 'sourcemap'],
+      // '../**/*.js': ['coverage'],
     },
+    // optionally, configure the reporter
+    coverageReporter: {
+      type : 'html',
+      dir : '../coverage/'
+    },
+
     webpack: {
       devtool: 'inline-source-map',
       resolve: {
