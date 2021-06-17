@@ -48,7 +48,7 @@ const modules = [
       })
     ].concat(PRETTY ? prettier({ parser: 'babel' }) : [])
   },
-  ...['browser', 'hash'].map(env => {
+  ...['browser'].map(env => {
     return {
       input: `${SOURCE_DIR}/${env}.ts`,
       output: {
