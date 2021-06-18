@@ -8,13 +8,11 @@ import {
 } from './PathUtils.js';
 import createTransitionManager from './createTransitionManager.js';
 import {
-  canUseDOM,
   getConfirmation,
   supportsHistory,
   supportsPopStateOnHashChange,
   isExtraneousPopstateEvent
 } from './DOMUtils.js';
-import invariant from './invariant.js';
 import warning from './warning.js';
 
 const PopStateEvent = 'popstate';
@@ -35,8 +33,6 @@ function getHistoryState() {
  * pushState, replaceState, and the popstate event.
  */
 function createBrowserHistory(props = {}) {
-  invariant(canUseDOM, 'Browser history needs a DOM');
-
   const globalHistory = window.history;
   const canUseHistory = supportsHistory();
   const needsHashChangeListener = !supportsPopStateOnHashChange();
@@ -253,14 +249,6 @@ function createBrowserHistory(props = {}) {
     globalHistory.go(n);
   }
 
-  function goBack() {
-    go(-1);
-  }
-
-  function goForward() {
-    go(1);
-  }
-
   let listenerCount = 0;
 
   function checkDOMListeners(delta) {
@@ -277,26 +265,6 @@ function createBrowserHistory(props = {}) {
       if (needsHashChangeListener)
         window.removeEventListener(HashChangeEvent, handleHashChange);
     }
-  }
-
-  let isBlocked = false;
-
-  function block(prompt = false) {
-    const unblock = transitionManager.setPrompt(prompt);
-
-    if (!isBlocked) {
-      checkDOMListeners(1);
-      isBlocked = true;
-    }
-
-    return () => {
-      if (isBlocked) {
-        isBlocked = false;
-        checkDOMListeners(-1);
-      }
-
-      return unblock();
-    };
   }
 
   function listen(listener) {
@@ -317,9 +285,6 @@ function createBrowserHistory(props = {}) {
     push,
     replace,
     go,
-    goBack,
-    goForward,
-    block,
     listen
   };
 

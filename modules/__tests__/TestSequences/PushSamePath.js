@@ -25,7 +25,7 @@ export default function(history, done) {
         pathname: '/home'
       });
 
-      history.goBack();
+      history.go(-1);
     },
     (location, action) => {
       expect(action).toBe('POP');
