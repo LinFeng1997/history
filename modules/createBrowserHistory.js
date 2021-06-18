@@ -1,15 +1,10 @@
 import { createLocation } from './LocationUtils.js';
 import {
-  addLeadingSlash,
-  stripTrailingSlash,
-  hasBasename,
-  stripBasename,
   createPath
 } from './PathUtils.js';
 import createTransitionManager from './createTransitionManager.js';
 import {
   getConfirmation,
-  supportsHistory,
   supportsPopStateOnHashChange,
   isExtraneousPopstateEvent
 } from './DOMUtils.js';
@@ -34,7 +29,6 @@ function getHistoryState() {
  */
 function createBrowserHistory(props = {}) {
   const globalHistory = window.history;
-  const canUseHistory = supportsHistory();
   const needsHashChangeListener = !supportsPopStateOnHashChange();
 
   const {
@@ -42,27 +36,13 @@ function createBrowserHistory(props = {}) {
     getUserConfirmation = getConfirmation,
     keyLength = 6
   } = props;
-  const basename = props.basename
-    ? stripTrailingSlash(addLeadingSlash(props.basename))
-    : '';
+  const basename = '';
 
   function getDOMLocation(historyState) {
     const { key, state } = historyState || {};
     const { pathname, search, hash } = window.location;
 
     let path = pathname + search + hash;
-
-    warning(
-      !basename || hasBasename(path, basename),
-      'You are attempting to use a basename on a page whose URL path does not begin ' +
-        'with the basename. Expected path "' +
-        path +
-        '" to begin with "' +
-        basename +
-        '".'
-    );
-
-    if (basename) path = stripBasename(path, basename);
 
     return createLocation(path, state, key);
   }
@@ -171,27 +151,18 @@ function createBrowserHistory(props = {}) {
         const href = createHref(location);
         const { key, state } = location;
 
-        if (canUseHistory) {
-          globalHistory.pushState({ key, state }, null, href);
+        globalHistory.pushState({ key, state }, null, href);
 
-          if (forceRefresh) {
-            window.location.href = href;
-          } else {
-            const prevIndex = allKeys.indexOf(history.location.key);
-            const nextKeys = allKeys.slice(0, prevIndex + 1);
-
-            nextKeys.push(location.key);
-            allKeys = nextKeys;
-
-            setState({ action, location });
-          }
-        } else {
-          warning(
-            state === undefined,
-            'Browser history cannot push state in browsers that do not support HTML5 history'
-          );
-
+        if (forceRefresh) {
           window.location.href = href;
+        } else {
+          const prevIndex = allKeys.indexOf(history.location.key);
+          const nextKeys = allKeys.slice(0, prevIndex + 1);
+
+          nextKeys.push(location.key);
+          allKeys = nextKeys;
+
+          setState({ action, location });
         }
       }
     );
@@ -221,25 +192,16 @@ function createBrowserHistory(props = {}) {
         const href = createHref(location);
         const { key, state } = location;
 
-        if (canUseHistory) {
-          globalHistory.replaceState({ key, state }, null, href);
+        globalHistory.replaceState({ key, state }, null, href);
 
-          if (forceRefresh) {
-            window.location.replace(href);
-          } else {
-            const prevIndex = allKeys.indexOf(history.location.key);
-
-            if (prevIndex !== -1) allKeys[prevIndex] = location.key;
-
-            setState({ action, location });
-          }
-        } else {
-          warning(
-            state === undefined,
-            'Browser history cannot replace state in browsers that do not support HTML5 history'
-          );
-
+        if (forceRefresh) {
           window.location.replace(href);
+        } else {
+          const prevIndex = allKeys.indexOf(history.location.key);
+
+          if (prevIndex !== -1) allKeys[prevIndex] = location.key;
+
+          setState({ action, location });
         }
       }
     );
