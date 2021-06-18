@@ -278,23 +278,6 @@ export interface History<S extends State = State> {
   go(delta: number): void;
 
   /**
-   * Navigates to the previous entry in the stack. Identical to go(-1).
-   *
-   * Warning: if the current location is the first location in the stack, this
-   * will unload the current document.
-   *
-   * @see https://github.com/ReactTraining/history/tree/master/docs/api-reference.md#history.back
-   */
-  back(): void;
-
-  /**
-   * Navigates to the next entry in the stack. Identical to go(1).
-   *
-   * @see https://github.com/ReactTraining/history/tree/master/docs/api-reference.md#history.forward
-   */
-  forward(): void;
-
-  /**
    * Sets up a listener that will be called whenever the current location
    * changes.
    *
@@ -304,17 +287,6 @@ export interface History<S extends State = State> {
    * @see https://github.com/ReactTraining/history/tree/master/docs/api-reference.md#history.listen
    */
   listen(listener: Listener<S>): () => void;
-
-  /**
-   * Prevents the current location from changing and sets up a listener that
-   * will be called instead.
-   *
-   * @param blocker - A function that will be called when a transition is blocked
-   * @returns unblock - A function that may be used to stop blocking
-   *
-   * @see https://github.com/ReactTraining/history/tree/master/docs/api-reference.md#history.block
-   */
-  block(blocker: Blocker<S>): () => void;
 }
 
 /**
@@ -343,23 +315,6 @@ const readOnly: <T extends unknown>(obj: T) => T = __DEV__
   ? obj => Object.freeze(obj)
   : obj => obj;
 
-function warning(cond: boolean, message: string) {
-  if (!cond) {
-    // eslint-disable-next-line no-console
-    if (typeof console !== 'undefined') console.warn(message);
-
-    try {
-      // Welcome to debugging history!
-      //
-      // This error is thrown as a convenience so you can more easily
-      // find the source for a warning that appears in the console by
-      // enabling "pause on exceptions" in your JavaScript debugger.
-      throw new Error(message);
-      // eslint-disable-next-line no-empty
-    } catch (e) {}
-  }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // BROWSER
 ////////////////////////////////////////////////////////////////////////////////
@@ -370,7 +325,6 @@ type HistoryState = {
   idx: number;
 };
 
-const BeforeUnloadEventType = 'beforeunload';
 const PopStateEventType = 'popstate';
 
 export type BrowserHistoryOptions = { window?: Window };
@@ -403,49 +357,9 @@ export function createBrowserHistory(
     ];
   }
 
-  let blockedPopTx: Transition | null = null;
   function handlePop() {
-    if (blockedPopTx) {
-      blockers.call(blockedPopTx);
-      blockedPopTx = null;
-    } else {
-      let nextAction = Action.Pop;
-      let [nextIndex, nextLocation] = getIndexAndLocation();
-
-      if (blockers.length) {
-        if (nextIndex != null) {
-          let delta = index - nextIndex;
-          if (delta) {
-            // Revert the POP
-            blockedPopTx = {
-              action: nextAction,
-              location: nextLocation,
-              retry() {
-                go(delta * -1);
-              }
-            };
-
-            go(delta);
-          }
-        } else {
-          // Trying to POP to a location with no index. We did not create
-          // this location, so we can't effectively block the navigation.
-          warning(
-            false,
-            // TODO: Write up a doc that explains our blocking strategy in
-            // detail and link to it here so people can understand better what
-            // is going on and how to avoid it.
-            `You are trying to block a POP navigation to a location that was not ` +
-              `created by the history library. The block will fail silently in ` +
-              `production, but in general you should do all navigation with the ` +
-              `history library (instead of using window.history.pushState directly) ` +
-              `to avoid this situation.`
-          );
-        }
-      } else {
-        applyTx(nextAction);
-      }
-    }
+    let nextAction = Action.Pop;
+    applyTx(nextAction);
   }
 
   window.addEventListener(PopStateEventType, handlePop);
@@ -453,7 +367,6 @@ export function createBrowserHistory(
   let action = Action.Pop;
   let [index, location] = getIndexAndLocation();
   let listeners = createEvents<Listener>();
-  let blockers = createEvents<Blocker>();
 
   if (index == null) {
     index = 0;
@@ -487,12 +400,6 @@ export function createBrowserHistory(
     ];
   }
 
-  function allowTx(action: Action, location: Location, retry: () => void) {
-    return (
-      !blockers.length || (blockers.call({ action, location, retry }), false)
-    );
-  }
-
   function applyTx(nextAction: Action) {
     action = nextAction;
     [index, location] = getIndexAndLocation();
@@ -502,42 +409,32 @@ export function createBrowserHistory(
   function push(to: To, state?: State) {
     let nextAction = Action.Push;
     let nextLocation = getNextLocation(to, state);
-    function retry() {
-      push(to, state);
+
+    let [historyState, url] = getHistoryStateAndUrl(nextLocation, index + 1);
+
+    // TODO: Support forced reloading
+    // try...catch because iOS limits us to 100 pushState calls :/
+    try {
+      globalHistory.pushState(historyState, '', url);
+    } catch (error) {
+      // They are going to lose state here, but there is no real
+      // way to warn them about it since the page will refresh...
+      window.location.assign(url);
     }
 
-    if (allowTx(nextAction, nextLocation, retry)) {
-      let [historyState, url] = getHistoryStateAndUrl(nextLocation, index + 1);
-
-      // TODO: Support forced reloading
-      // try...catch because iOS limits us to 100 pushState calls :/
-      try {
-        globalHistory.pushState(historyState, '', url);
-      } catch (error) {
-        // They are going to lose state here, but there is no real
-        // way to warn them about it since the page will refresh...
-        window.location.assign(url);
-      }
-
-      applyTx(nextAction);
-    }
+    applyTx(nextAction);
   }
 
   function replace(to: To, state?: State) {
     let nextAction = Action.Replace;
     let nextLocation = getNextLocation(to, state);
-    function retry() {
-      replace(to, state);
-    }
 
-    if (allowTx(nextAction, nextLocation, retry)) {
-      let [historyState, url] = getHistoryStateAndUrl(nextLocation, index);
+    let [historyState, url] = getHistoryStateAndUrl(nextLocation, index);
 
-      // TODO: Support forced reloading
-      globalHistory.replaceState(historyState, '', url);
+    // TODO: Support forced reloading
+    globalHistory.replaceState(historyState, '', url);
 
-      applyTx(nextAction);
-    }
+    applyTx(nextAction);
   }
 
   function go(delta: number) {
@@ -555,32 +452,8 @@ export function createBrowserHistory(
     push,
     replace,
     go,
-    back() {
-      go(-1);
-    },
-    forward() {
-      go(1);
-    },
     listen(listener) {
       return listeners.push(listener);
-    },
-    block(blocker) {
-      let unblock = blockers.push(blocker);
-
-      if (blockers.length === 1) {
-        window.addEventListener(BeforeUnloadEventType, promptBeforeUnload);
-      }
-
-      return function() {
-        unblock();
-
-        // Remove the beforeunload listener so the document may
-        // still be salvageable in the pagehide event.
-        // See https://html.spec.whatwg.org/#unloading-documents
-        if (!blockers.length) {
-          window.removeEventListener(BeforeUnloadEventType, promptBeforeUnload);
-        }
-      };
     }
   };
 
@@ -602,13 +475,6 @@ export type InitialEntry = string | PartialLocation;
 ////////////////////////////////////////////////////////////////////////////////
 // UTILS
 ////////////////////////////////////////////////////////////////////////////////
-
-function promptBeforeUnload(event: BeforeUnloadEvent) {
-  // Cancel the event.
-  event.preventDefault();
-  // Chrome (and legacy IE) requires returnValue to be set.
-  event.returnValue = '';
-}
 
 type Events<F> = {
   length: number;

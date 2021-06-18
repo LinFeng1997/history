@@ -116,28 +116,4 @@ describe('a browser history', () => {
       EncodedReservedCharacters(history, done);
     });
   });
-
-  describe('back', () => {
-    it('calls change listeners with the previous location', done => {
-      GoBack(history, done);
-    });
-  });
-
-  describe('forward', () => {
-    it('calls change listeners with the next location', done => {
-      GoForward(history, done);
-    });
-  });
-
-  describe('block', () => {
-    it('blocks all transitions', done => {
-      BlockEverything(history, done);
-    });
-  });
-
-  describe('block a POP without listening', () => {
-    it('receives the next ({ action, location })', done => {
-      BlockPopWithoutListening(history, done);
-    });
-  });
 });
